@@ -1,0 +1,1552 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Интерактивная карта</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        .app-container {
+            display: flex;
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+
+        .sidebar {
+            width: 280px;
+            background-color: #1e1f2c;
+            color: #f0f0f0;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            box-shadow: 2px 0 12px rgba(0, 0, 0, 0.3);
+            z-index: 10;
+            flex-shrink: 0;
+        }
+
+        .tags-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        .controls-section {
+            padding: 10px 20px 20px;
+            flex-shrink: 0;
+            border-top: 1px solid #3a3b4a;
+        }
+
+        .menu-header {
+            padding: 20px 20px 16px;
+            font-size: 1.3rem;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #3a3b4a;
+            position: relative;
+        }
+
+        .add-map-btn,
+        .add-mark-btn,
+        .add-tag-btn {
+            background: #4c9aff;
+            border: none;
+            color: white;
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            font-size: 22px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: 0.2s;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+            position: relative;
+        }
+
+        .add-map-btn:hover::after,
+        .add-mark-btn:hover::after,
+        .add-tag-btn:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            right: 100%;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(0, 0, 0, 0.85);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 8px;
+            font-size: 12px;
+            white-space: nowrap;
+            pointer-events: none;
+            margin-right: 8px;
+            z-index: 30;
+        }
+
+        .add-map-btn:hover,
+        .add-mark-btn:hover,
+        .add-tag-btn:hover {
+            background: #2b7ad9;
+            transform: scale(1.05);
+        }
+
+        .section-content {
+            padding: 15px 20px;
+            min-height: 100px;
+        }
+
+        .icons-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+        }
+
+        .icon-item {
+            width: 60px;
+            height: 60px;
+            background: #2c2e3e;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: grab;
+            transition: 0.2s;
+            border: 2px solid transparent;
+        }
+
+        .icon-item:active {
+            cursor: grabbing;
+        }
+
+        .icon-item:hover {
+            transform: scale(1.05);
+            background: #3a3c4e;
+        }
+
+        .icon-item img {
+            width: 50px;
+            height: 50px;
+            object-fit: contain;
+            pointer-events: none;
+        }
+
+        .filter-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 1rem;
+            padding: 8px 12px;
+            background: #2c2e3e;
+            border-radius: 12px;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+
+        .filter-item:hover {
+            background-color: #3a3c4e;
+        }
+
+        .filter-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
+        }
+
+        .filter-info label {
+            flex: 1;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .filter-info input {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: #4c9aff;
+        }
+
+        .tag-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .edit-tag-btn,
+        .delete-tag-btn {
+            background: none;
+            border: none;
+            color: #aaa;
+            cursor: pointer;
+            font-size: 16px;
+            padding: 4px 6px;
+            border-radius: 6px;
+        }
+
+        .edit-tag-btn:hover {
+            background: #4c9aff;
+            color: white;
+        }
+
+        .delete-tag-btn:hover {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .empty-message {
+            text-align: center;
+            color: #888;
+            font-size: 0.9rem;
+            padding: 20px 0;
+        }
+
+        .zoom-status {
+            text-align: center;
+            padding: 10px;
+            font-size: 0.9rem;
+            background-color: #14151f;
+            border-radius: 32px;
+            font-family: monospace;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+
+        .zoom-status:hover {
+            background-color: #4c9aff;
+        }
+
+        .export-import-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .export-btn,
+        .import-btn {
+            flex: 1;
+            background: #27ae60;
+            border: none;
+            color: white;
+            padding: 10px;
+            border-radius: 32px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+
+        .export-btn:hover {
+            background: #2ecc71;
+        }
+
+        .import-btn {
+            background: #f39c12;
+        }
+
+        .import-btn:hover {
+            background: #e67e22;
+        }
+
+        .map-container {
+            flex: 1;
+            background-color: #2c2e3a;
+            position: relative;
+            overflow: hidden;
+            cursor: grab;
+        }
+
+        .map-container:active {
+            cursor: grabbing;
+        }
+
+        .map-viewport {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .map-image {
+            position: absolute;
+            transform-origin: 0 0;
+            will-change: transform;
+            pointer-events: none;
+        }
+
+        .buttons-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: auto;
+            z-index: 10;
+        }
+
+        .map-button {
+            position: absolute;
+            cursor: pointer;
+            background: transparent;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.1s;
+            z-index: 20;
+        }
+
+        .map-button:hover {
+            transform: scale(1.05);
+        }
+
+        .map-button img {
+            width: 90%;
+            height: 90%;
+            object-fit: contain;
+            pointer-events: none;
+        }
+
+        .map-button.hidden {
+            display: none;
+        }
+
+        /* Кастомный тултип */
+        .custom-tooltip {
+            position: fixed;
+            background: #1e1f2c;
+            border: 1px solid #4c9aff;
+            border-radius: 12px;
+            padding: 12px 16px;
+            max-width: 256px;
+            min-width: 150px;
+            z-index: 1000;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            pointer-events: none;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .custom-tooltip .tooltip-title {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #ff8c42;
+            text-align: center;
+            margin-bottom: 8px;
+            word-wrap: break-word;
+        }
+
+        .custom-tooltip .tooltip-divider {
+            height: 1px;
+            background: #4c9aff;
+            margin: 8px 0;
+        }
+
+        .custom-tooltip .tooltip-desc {
+            font-size: 0.85rem;
+            color: #f0f0f0;
+            line-height: 1.4;
+            word-wrap: break-word;
+            white-space: pre-line;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: #1e1f2c;
+            color: white;
+            padding: 24px;
+            border-radius: 20px;
+            width: 360px;
+        }
+
+        .modal-content h3 {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .modal-content label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 0.85rem;
+            color: #aaa;
+        }
+
+        .modal-content input,
+        .modal-content textarea,
+        .modal-content select {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            border: none;
+            background: #2c2e3e;
+            color: white;
+            font-family: inherit;
+        }
+
+        .modal-content input[type="range"] {
+            padding: 0;
+        }
+
+        .delete-btn {
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            width: 100%;
+            margin-bottom: 15px;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+
+        .modal-buttons button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .save-btn {
+            background: #4c9aff;
+            color: white;
+        }
+
+        .cancel-btn {
+            background: #555;
+            color: white;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-container">
+        <div class="sidebar">
+            <div class="tags-section">
+                <div class="menu-header">
+                    🗺️ Карта
+                    <button class="add-map-btn" id="addMapBtn" data-tooltip="Загрузить карту">+</button>
+                </div>
+                <div class="section-content" id="mapSection">
+                    <div id="mapEmpty" class="empty-message">Нет карты. Нажмите + чтобы загрузить</div>
+                    <div id="mapLoaded" style="display: none;">
+                        <div style="background:#2c2e3e;border-radius:12px;padding:10px;text-align:center;">✅ Карта
+                            загружена</div>
+                    </div>
+                </div>
+
+                <div class="menu-header">
+                    📍 Метки
+                    <button class="add-mark-btn" id="addMarkBtn" data-tooltip="Добавить метку">+</button>
+                </div>
+                <div class="section-content" id="marksSection">
+                    <div id="marksEmpty" class="empty-message">Нет меток. Нажмите + чтобы добавить</div>
+                    <div class="icons-grid" id="iconsGrid" style="display: none;"></div>
+                </div>
+
+                <div class="menu-header">
+                    🏷️ Теги
+                    <button class="add-tag-btn" id="addTagBtnMenu" data-tooltip="Добавить тег">+</button>
+                </div>
+                <div class="section-content" id="tagsSection">
+                    <div id="tagsEmpty" class="empty-message">Нет тегов. Нажмите + чтобы добавить</div>
+                    <div id="tagsList" style="display: none;"></div>
+                </div>
+            </div>
+            <div class="controls-section">
+                <div class="zoom-status" id="zoomStatusLabel">Zoom: 1.00x</div>
+                <div class="export-import-buttons">
+                    <button class="export-btn" id="exportBtn">📤 Экспорт</button>
+                    <button class="import-btn" id="importBtn">📥 Импорт</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="map-container" id="mapContainer">
+            <div class="map-viewport" id="mapViewport">
+                <img class="map-image" id="mapImage" style="display: none;" draggable="false">
+                <div class="buttons-layer" id="buttonsLayer"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="editModal">
+        <div class="modal-content">
+            <h3>✏️ Редактирование метки</h3>
+            <label>Название</label>
+            <input type="text" id="editName" placeholder="Название">
+            <label>Тег</label>
+            <select id="editTag"></select>
+            <label>Описание</label>
+            <textarea id="editDesc" placeholder="Описание"></textarea>
+            <label>Размер: <span id="sizeValueLabel">50</span>px</label>
+            <input type="range" id="editSize" min="20" max="100" step="2" value="50">
+            <button class="delete-btn" id="deleteButtonBtn">🗑️ Удалить метку</button>
+            <div class="modal-buttons">
+                <button class="cancel-btn" id="modalCancel">Отмена</button>
+                <button class="save-btn" id="modalSave">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let scale = 1.0;
+        let translateX = 0, translateY = 0;
+        let isDragging = false;
+        let dragStartX = 0, dragStartY = 0;
+        let dragStartTranslateX = 0, dragStartTranslateY = 0;
+        let imgNaturalWidth = 1, imgNaturalHeight = 1;
+        let imgLoaded = false;
+        let currentMapBase64 = null;
+
+        let buttonsData = [];
+        let nextId = 1;
+        let availableTags = [];
+        let tagCheckState = {};
+        let currentEditingButton = null;
+        let iconItems = [];
+        let nextIconId = 1;
+
+        // Переменные для кастомного тултипа
+        let activeTooltip = null;
+        let activeButton = null;
+        let isPinned = false; // Флаг закрепления тултипа при клике
+
+        const mapContainer = document.getElementById('mapContainer');
+        const mapImage = document.getElementById('mapImage');
+        const buttonsLayer = document.getElementById('buttonsLayer');
+        const zoomLabel = document.getElementById('zoomStatusLabel');
+        const tagsList = document.getElementById('tagsList');
+        const tagsEmpty = document.getElementById('tagsEmpty');
+        const iconsGrid = document.getElementById('iconsGrid');
+        const marksEmpty = document.getElementById('marksEmpty');
+        const mapEmpty = document.getElementById('mapEmpty');
+        const mapLoaded = document.getElementById('mapLoaded');
+
+        const MIN_SCALE = 0.5, MAX_SCALE = 3.0;
+
+        // Функции для кастомного тултипа
+        function hideTooltip() {
+            if (activeTooltip) {
+                activeTooltip.remove();
+                activeTooltip = null;
+                activeButton = null;
+            }
+            isPinned = false;
+        }
+
+        function showTooltip(btnData, mouseX, mouseY, isClick = false) {
+            // Если тултип уже показан и это не клик по той же метке, скрываем
+            if (activeTooltip && activeButton !== btnData && !isClick) {
+                hideTooltip();
+            }
+            // Если клик по той же метке и тултип уже виден, скрываем
+            if (isClick && activeButton === btnData && activeTooltip) {
+                hideTooltip();
+                return;
+            }
+            // Если клик по другой метке, скрываем старый и показываем новый
+            if (isClick && activeButton !== btnData) {
+                hideTooltip();
+            }
+
+            const tooltip = document.createElement('div');
+            tooltip.className = 'custom-tooltip';
+
+            const title = document.createElement('div');
+            title.className = 'tooltip-title';
+            title.textContent = btnData.name || 'Метка';
+
+            const divider = document.createElement('div');
+            divider.className = 'tooltip-divider';
+
+            const desc = document.createElement('div');
+            desc.className = 'tooltip-desc';
+            desc.textContent = btnData.description || 'Нет описания';
+
+            tooltip.appendChild(title);
+            tooltip.appendChild(divider);
+            tooltip.appendChild(desc);
+
+            document.body.appendChild(tooltip);
+
+            // Позиционирование
+            const tooltipRect = tooltip.getBoundingClientRect();
+            let left = mouseX + 15;
+            let top = mouseY - tooltipRect.height / 2;
+
+            if (left + tooltipRect.width > window.innerWidth) {
+                left = mouseX - tooltipRect.width - 15;
+            }
+            if (top < 0) {
+                top = 5;
+            }
+            if (top + tooltipRect.height > window.innerHeight) {
+                top = window.innerHeight - tooltipRect.height - 5;
+            }
+
+            tooltip.style.left = left + 'px';
+            tooltip.style.top = top + 'px';
+
+            activeTooltip = tooltip;
+            activeButton = btnData;
+            if (isClick) {
+                isPinned = true;
+            }
+        }
+
+        function hideTooltipOnEmptyClick(e) {
+            // Если тултип закреплен (по клику), не скрываем при наведении на другие элементы
+            if (isPinned) {
+                // Закрепленный тултип скрывается только при клике в пустое место
+                if (!e.target.closest('.map-button')) {
+                    hideTooltip();
+                }
+                return;
+            }
+            // Обычный тултип скрываем при клике куда-либо
+            hideTooltip();
+        }
+
+        function updateTooltipPositionOnScroll() {
+            if (activeTooltip && activeButton && activeButton.element) {
+                const rect = activeButton.element.getBoundingClientRect();
+                const mouseX = rect.left + rect.width / 2;
+                const mouseY = rect.top;
+
+                const tooltipRect = activeTooltip.getBoundingClientRect();
+                let left = mouseX + 15;
+                let top = mouseY - tooltipRect.height / 2;
+
+                if (left + tooltipRect.width > window.innerWidth) {
+                    left = mouseX - tooltipRect.width - 15;
+                }
+                if (top < 0) {
+                    top = 5;
+                }
+                if (top + tooltipRect.height > window.innerHeight) {
+                    top = window.innerHeight - tooltipRect.height - 5;
+                }
+
+                activeTooltip.style.left = left + 'px';
+                activeTooltip.style.top = top + 'px';
+            }
+        }
+
+        let contextMenu = null;
+        function showContextMenu(x, y, iconId) {
+            if (contextMenu) contextMenu.remove();
+            contextMenu = document.createElement('div');
+            contextMenu.className = 'context-menu';
+            contextMenu.style.left = x + 'px';
+            contextMenu.style.top = y + 'px';
+
+            const deleteItem = document.createElement('div');
+            deleteItem.className = 'context-menu-item';
+            deleteItem.innerHTML = '🗑️ Удалить метку';
+            deleteItem.onclick = () => {
+                deleteIconItem(iconId);
+                contextMenu.remove();
+                contextMenu = null;
+            };
+
+            contextMenu.appendChild(deleteItem);
+            document.body.appendChild(contextMenu);
+
+            setTimeout(() => {
+                document.addEventListener('click', function removeMenu() {
+                    if (contextMenu) contextMenu.remove();
+                    contextMenu = null;
+                    document.removeEventListener('click', removeMenu);
+                });
+            }, 0);
+        }
+
+        function deleteIconItem(iconId) {
+            const index = iconItems.findIndex(item => item.id === iconId);
+            if (index !== -1) {
+                iconItems.splice(index, 1);
+                renderIconsGrid();
+            }
+        }
+
+        function updateTransform() {
+            if (!imgLoaded) return;
+            scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale));
+            mapImage.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
+            zoomLabel.innerText = `Zoom: ${scale.toFixed(2)}x`;
+            updateButtonsPosition();
+            updateTooltipPositionOnScroll();
+        }
+
+        function screenToImage(screenX, screenY) {
+            return { x: (screenX - translateX) / scale, y: (screenY - translateY) / scale };
+        }
+
+        function imageToScreen(imgX, imgY) {
+            return { x: imgX * scale + translateX, y: imgY * scale + translateY };
+        }
+
+        function updateButtonsPosition() {
+            buttonsData.forEach(btn => {
+                if (btn.element && imgLoaded) {
+                    const pos = imageToScreen(btn.x, btn.y);
+                    const size = btn.size || 50;
+                    btn.element.style.left = `${pos.x - size / 2}px`;
+                    btn.element.style.top = `${pos.y - size}px`;
+                    btn.element.style.width = `${size}px`;
+                    btn.element.style.height = `${size}px`;
+                }
+            });
+            updateTooltipPositionOnScroll();
+        }
+
+        function renderIconsGrid() {
+            if (iconItems.length === 0) {
+                iconsGrid.style.display = 'none';
+                marksEmpty.style.display = 'block';
+            } else {
+                iconsGrid.style.display = 'grid';
+                marksEmpty.style.display = 'none';
+                iconsGrid.innerHTML = '';
+                iconItems.forEach((item) => {
+                    const iconDiv = document.createElement('div');
+                    iconDiv.className = 'icon-item';
+                    iconDiv.setAttribute('data-icon-id', item.id);
+                    iconDiv.setAttribute('draggable', 'true');
+                    const img = document.createElement('img');
+                    img.src = item.iconUrl;
+                    img.alt = 'метка';
+                    iconDiv.appendChild(img);
+                    iconDiv.title = item.name || 'Метка';
+
+                    iconDiv.addEventListener('dragstart', (e) => {
+                        e.dataTransfer.setData('text/plain', JSON.stringify({
+                            iconId: item.id,
+                            iconUrl: item.iconUrl,
+                            name: item.name || 'Метка',
+                            description: item.description || '',
+                            tag: item.tag
+                        }));
+                        e.dataTransfer.effectAllowed = 'copy';
+                        iconDiv.style.opacity = '0.5';
+                    });
+                    iconDiv.addEventListener('dragend', (e) => {
+                        iconDiv.style.opacity = '1';
+                    });
+
+                    iconDiv.addEventListener('contextmenu', (e) => {
+                        e.preventDefault();
+                        showContextMenu(e.clientX, e.clientY, item.id);
+                    });
+
+                    iconsGrid.appendChild(iconDiv);
+                });
+            }
+        }
+
+        function renderTagsMenu() {
+            if (availableTags.length === 0) {
+                tagsList.style.display = 'none';
+                tagsEmpty.style.display = 'block';
+            } else {
+                tagsList.style.display = 'block';
+                tagsEmpty.style.display = 'none';
+                tagsList.innerHTML = '';
+                availableTags.forEach(tag => {
+                    const isChecked = tagCheckState[tag] !== false;
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'filter-item';
+
+                    const infoDiv = document.createElement('div');
+                    infoDiv.className = 'filter-info';
+                    const cb = document.createElement('input');
+                    cb.type = 'checkbox';
+                    cb.checked = isChecked;
+                    cb.addEventListener('change', (e) => {
+                        tagCheckState[tag] = e.target.checked;
+                        updateFilter();
+                    });
+                    const label = document.createElement('label');
+                    label.textContent = tag;
+                    infoDiv.appendChild(cb);
+                    infoDiv.appendChild(label);
+
+                    const actionsDiv = document.createElement('div');
+                    actionsDiv.className = 'tag-actions';
+                    const editBtn = document.createElement('button');
+                    editBtn.innerHTML = '✏️';
+                    editBtn.className = 'edit-tag-btn';
+                    editBtn.onclick = () => {
+                        const newName = prompt('Редактировать тег (макс 8 символов):', tag);
+                        if (newName && newName.trim() && newName.trim().length <= 8 && newName.trim() !== tag) {
+                            const oldTag = tag;
+                            const newTag = newName.trim();
+                            if (!availableTags.includes(newTag)) {
+                                const index = availableTags.indexOf(oldTag);
+                                if (index !== -1) availableTags[index] = newTag;
+                                buttonsData.forEach(btn => { if (btn.tag === oldTag) btn.tag = newTag; });
+                                iconItems.forEach(icon => { if (icon.tag === oldTag) icon.tag = newTag; });
+                                if (tagCheckState[oldTag] !== undefined) {
+                                    tagCheckState[newTag] = tagCheckState[oldTag];
+                                    delete tagCheckState[oldTag];
+                                }
+                                renderTagsMenu();
+                                updateTagSelect();
+                                updateFilter();
+                            } else alert('Тег уже существует!');
+                        } else if (newName && newName.trim().length > 8) alert('Максимум 8 символов!');
+                    };
+
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.innerHTML = '🗑️';
+                    deleteBtn.className = 'delete-tag-btn';
+                    deleteBtn.onclick = () => {
+                        if (confirm(`Удалить тег "${tag}"? Метки с этим тегом станут без тега`)) {
+                            const index = availableTags.indexOf(tag);
+                            if (index !== -1) availableTags.splice(index, 1);
+                            delete tagCheckState[tag];
+                            buttonsData.forEach(btn => { if (btn.tag === tag) btn.tag = ''; });
+                            iconItems.forEach(icon => { if (icon.tag === tag) icon.tag = ''; });
+                            renderTagsMenu();
+                            updateTagSelect();
+                            updateFilter();
+                        }
+                    };
+
+                    actionsDiv.appendChild(editBtn);
+                    actionsDiv.appendChild(deleteBtn);
+                    itemDiv.appendChild(infoDiv);
+                    itemDiv.appendChild(actionsDiv);
+                    tagsList.appendChild(itemDiv);
+                });
+            }
+        }
+
+        function updateTagSelect() {
+            const select = document.getElementById('editTag');
+            if (!select) return;
+            select.innerHTML = '';
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = 'Без тега';
+            select.appendChild(option);
+            availableTags.forEach(tag => {
+                const opt = document.createElement('option');
+                opt.value = tag;
+                opt.textContent = tag;
+                select.appendChild(opt);
+            });
+        }
+
+        function updateFilter() {
+            buttonsData.forEach(btn => {
+                if (btn.element) {
+                    const shouldShow = btn.tag === '' || tagCheckState[btn.tag] !== false;
+                    if (shouldShow) btn.element.classList.remove('hidden');
+                    else btn.element.classList.add('hidden');
+                }
+            });
+        }
+
+        function createButtonElement(btnData) {
+            const div = document.createElement('div');
+            div.className = 'map-button';
+            const shouldShow = btnData.tag === '' || tagCheckState[btnData.tag] !== false;
+            if (!shouldShow) div.classList.add('hidden');
+            div.setAttribute('data-id', btnData.id);
+            const img = document.createElement('img');
+            img.src = btnData.iconUrl;
+            div.appendChild(img);
+
+            // Обработчик наведения мыши
+            div.addEventListener('mouseenter', (e) => {
+                if (!isPinned) {
+                    const rect = div.getBoundingClientRect();
+                    showTooltip(btnData, rect.left + rect.width / 2, rect.top, false);
+                }
+            });
+
+            div.addEventListener('mouseleave', () => {
+                if (!isPinned) {
+                    hideTooltip();
+                }
+            });
+
+            // Клик для закрепления
+            div.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const rect = div.getBoundingClientRect();
+                showTooltip(btnData, rect.left + rect.width / 2, rect.top, true);
+            });
+
+            div.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                hideTooltip();
+                openEditModal(btnData.id);
+            });
+
+            div.addEventListener('mousedown', (e) => {
+                if (e.button === 0) {
+                    e.stopPropagation();
+                    startDragButton(e, btnData);
+                }
+            });
+
+            if (imgLoaded) {
+                const pos = imageToScreen(btnData.x, btnData.y);
+                const size = btnData.size || 50;
+                div.style.left = `${pos.x - size / 2}px`;
+                div.style.top = `${pos.y - size}px`;
+            }
+            div.style.position = 'absolute';
+            return div;
+        }
+
+        function startDragButton(e, btnData) {
+            hideTooltip();
+            e.preventDefault();
+            e.stopPropagation();
+            let startX = e.clientX, startY = e.clientY;
+            let startImgX = btnData.x, startImgY = btnData.y;
+
+            function onMouseMove(moveEvent) {
+                const rect = mapContainer.getBoundingClientRect();
+                const deltaX = moveEvent.clientX - startX;
+                const deltaY = moveEvent.clientY - startY;
+                const newScreenX = (startImgX * scale + translateX) + deltaX;
+                const newScreenY = (startImgY * scale + translateY) + deltaY;
+                const newImgCoords = screenToImage(newScreenX, newScreenY);
+                btnData.x = Math.min(Math.max(newImgCoords.x, 5), imgNaturalWidth - 5);
+                btnData.y = Math.min(Math.max(newImgCoords.y, 5), imgNaturalHeight - 5);
+                updateButtonsPosition();
+            }
+
+            function onMouseUp() {
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+            }
+
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        }
+
+        function addButtonToMap(x, y, name, tag, description, iconUrl) {
+            const selectedTag = tag || '';
+            const id = nextId++;
+            const btnData = { id, x, y, name: name || 'Метка', tag: selectedTag, description: description || '', size: 50, iconUrl: iconUrl, element: null };
+            const element = createButtonElement(btnData);
+            btnData.element = element;
+            buttonsLayer.appendChild(element);
+            buttonsData.push(btnData);
+            updateButtonsPosition();
+            return btnData;
+        }
+
+        function updateButtonData(id, newName, newTag, newDesc, newSize) {
+            const btn = buttonsData.find(b => b.id === id);
+            if (btn) {
+                btn.name = newName;
+                btn.tag = newTag;
+                btn.description = newDesc;
+                btn.size = newSize;
+                if (btn.element) {
+                    updateButtonsPosition();
+                    updateFilter();
+                }
+            }
+        }
+
+        function deleteButton(id) {
+            const index = buttonsData.findIndex(b => b.id === id);
+            if (index !== -1) {
+                buttonsData[index].element?.remove();
+                buttonsData.splice(index, 1);
+                closeModal();
+                hideTooltip();
+            }
+        }
+
+        function openEditModal(buttonId) {
+            hideTooltip();
+            const btn = buttonsData.find(b => b.id === buttonId);
+            if (!btn) return;
+            currentEditingButton = btn;
+            document.getElementById('editName').value = btn.name || '';
+            document.getElementById('editTag').value = btn.tag || '';
+            document.getElementById('editDesc').value = btn.description || '';
+            const slider = document.getElementById('editSize');
+            slider.value = btn.size || 50;
+            document.getElementById('sizeValueLabel').innerText = slider.value;
+            slider.oninput = function () { document.getElementById('sizeValueLabel').innerText = this.value; };
+            document.getElementById('editModal').classList.add('active');
+        }
+
+        function closeModal() { document.getElementById('editModal').classList.remove('active'); currentEditingButton = null; }
+        function saveCurrentButton() {
+            if (currentEditingButton) {
+                updateButtonData(currentEditingButton.id, document.getElementById('editName').value, document.getElementById('editTag').value, document.getElementById('editDesc').value, parseInt(document.getElementById('editSize').value, 10));
+                closeModal();
+            }
+        }
+
+        function loadMap(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                currentMapBase64 = e.target.result;
+                mapImage.src = currentMapBase64;
+                mapImage.onload = () => {
+                    imgNaturalWidth = mapImage.naturalWidth;
+                    imgNaturalHeight = mapImage.naturalHeight;
+                    imgLoaded = true;
+                    mapImage.style.display = 'block';
+                    mapEmpty.style.display = 'none';
+                    mapLoaded.style.display = 'block';
+                    scale = 1.0;
+                    const rect = mapContainer.getBoundingClientRect();
+                    translateX = (rect.width - imgNaturalWidth) / 2;
+                    translateY = (rect.height - imgNaturalHeight) / 2;
+                    updateTransform();
+                };
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function handleWheel(e) {
+            e.preventDefault();
+            if (!imgLoaded) return;
+            const delta = -e.deltaY;
+            const zoomFactor = delta > 0 ? 1.08 : 0.93;
+            let ns = scale * zoomFactor;
+            ns = Math.min(MAX_SCALE, Math.max(MIN_SCALE, ns));
+            if (ns === scale) return;
+            const rect = mapContainer.getBoundingClientRect();
+            const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+            const ix = (mx - translateX) / scale, iy = (my - translateY) / scale;
+            scale = ns;
+            translateX = mx - ix * scale;
+            translateY = my - iy * scale;
+            updateTransform();
+        }
+
+        function onMouseDown(e) {
+            if (e.button !== 0 || e.target.closest('.map-button')) return;
+            e.preventDefault();
+            isDragging = true;
+            dragStartX = e.clientX;
+            dragStartY = e.clientY;
+            dragStartTranslateX = translateX;
+            dragStartTranslateY = translateY;
+            mapContainer.style.cursor = 'grabbing';
+            hideTooltip();
+        }
+
+        function onMouseMove(e) {
+            if (!isDragging) return;
+            translateX = dragStartTranslateX + (e.clientX - dragStartX);
+            translateY = dragStartTranslateY + (e.clientY - dragStartY);
+            updateTransform();
+        }
+
+        function onMouseUp() { isDragging = false; mapContainer.style.cursor = 'grab'; }
+        function resetView() {
+            if (imgLoaded) {
+                scale = 1.0;
+                const rect = mapContainer.getBoundingClientRect();
+                translateX = (rect.width - imgNaturalWidth) / 2;
+                translateY = (rect.height - imgNaturalHeight) / 2;
+                updateTransform();
+                hideTooltip();
+            }
+        }
+
+        mapContainer.addEventListener('wheel', handleWheel, { passive: false });
+        mapContainer.addEventListener('mousedown', onMouseDown);
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
+        zoomLabel.addEventListener('click', resetView);
+        mapContainer.style.cursor = 'grab';
+
+        // Клик в пустое место для скрытия закрепленного тултипа
+        document.addEventListener('click', hideTooltipOnEmptyClick);
+
+        mapContainer.addEventListener('dragover', (e) => e.preventDefault());
+        mapContainer.addEventListener('drop', (e) => {
+            e.preventDefault();
+            if (!imgLoaded) { alert('Сначала загрузите карту!'); return; }
+
+            const rawData = e.dataTransfer.getData('text/plain');
+            if (rawData) {
+                const iconData = JSON.parse(rawData);
+                const rect = mapContainer.getBoundingClientRect();
+                const screenX = e.clientX - rect.left;
+                const screenY = e.clientY - rect.top;
+                const imgCoords = screenToImage(screenX, screenY);
+                const x = Math.min(Math.max(imgCoords.x, 10), imgNaturalWidth - 10);
+                const y = Math.min(Math.max(imgCoords.y, 10), imgNaturalHeight - 10);
+                addButtonToMap(x, y, iconData.name, iconData.tag, iconData.description, iconData.iconUrl);
+            }
+        });
+
+        document.getElementById('addMapBtn').addEventListener('click', () => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/jpeg,image/png';
+            input.onchange = (e) => { if (e.target.files[0]) loadMap(e.target.files[0]); };
+            input.click();
+        });
+
+        document.getElementById('addMarkBtn').addEventListener('click', () => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/jpeg,image/png,image/svg+xml';
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        const iconUrl = event.target.result;
+                        iconItems.push({
+                            id: nextIconId++,
+                            iconUrl: iconUrl,
+                            name: `Метка ${iconItems.length + 1}`,
+                            description: '',
+                            tag: ''
+                        });
+                        renderIconsGrid();
+                    };
+                    reader.readAsDataURL(file);
+                }
+            };
+            input.click();
+        });
+
+        document.getElementById('addTagBtnMenu').addEventListener('click', () => {
+            const tagName = prompt('Введите название тега (макс 8 символов):');
+            if (tagName && tagName.trim() && tagName.trim().length <= 8 && !availableTags.includes(tagName.trim())) {
+                availableTags.push(tagName.trim());
+                tagCheckState[tagName.trim()] = true;
+                renderTagsMenu();
+                updateTagSelect();
+            } else if (tagName && tagName.trim().length > 8) alert('Максимум 8 символов!');
+            else if (tagName && availableTags.includes(tagName.trim())) alert('Такой тег уже существует!');
+        });
+
+        document.getElementById('modalSave').addEventListener('click', saveCurrentButton);
+        document.getElementById('modalCancel').addEventListener('click', closeModal);
+        document.getElementById('deleteButtonBtn').addEventListener('click', () => { if (currentEditingButton && confirm('Удалить?')) deleteButton(currentEditingButton.id); });
+
+        function generateViewerHTML(data) {
+            const dataStr = JSON.stringify(data);
+            return `<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Интерактивная карта</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;user-select:none;}
+body{font-family:"Segoe UI",sans-serif;overflow:hidden;height:100vh;width:100vw;}
+.app-container{display:flex;width:100%;height:100%;}
+.sidebar{width:280px;background-color:#1e1f2c;color:#f0f0f0;display:flex;flex-direction:column;box-shadow:2px 0 12px rgba(0,0,0,0.3);flex-shrink:0;}
+.tags-section{flex:1;overflow-y:auto;}
+.menu-header{padding:20px 20px 16px;font-size:1.3rem;font-weight:bold;border-bottom:1px solid #3a3b4a;}
+.menu-items{padding:20px;display:flex;flex-direction:column;gap:12px;}
+.filter-item{display:flex;align-items:center;padding:8px 12px;background:#2c2e3e;border-radius:12px;gap:12px;}
+.filter-info{display:flex;align-items:center;gap:12px;flex:1;}
+.filter-info label{flex:1;font-weight:500;cursor:pointer;}
+.filter-info input{width:18px;height:18px;cursor:pointer;accent-color:#4c9aff;}
+.controls-section{padding:10px 20px 20px;border-top:1px solid #3a3b4a;}
+.zoom-status{text-align:center;padding:10px;background-color:#14151f;border-radius:32px;font-family:monospace;cursor:pointer;}
+.map-container{flex:1;background-color:#2c2e3a;position:relative;overflow:hidden;cursor:grab;}
+.map-container:active{cursor:grabbing;}
+.map-viewport{width:100%;height:100%;position:relative;overflow:hidden;}
+.map-image{position:absolute;transform-origin:0 0;will-change:transform;pointer-events:none;}
+.buttons-layer{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:auto;z-index:10;}
+.map-button{position:absolute;cursor:pointer;background:transparent;border:none;display:flex;align-items:center;justify-content:center;transition:transform 0.1s;z-index:20;}
+.map-button:hover{transform:scale(1.05);}
+.map-button img{width:90%;height:90%;object-fit:contain;pointer-events:none;}
+.map-button.hidden{display:none;}
+.custom-tooltip{position:fixed;background:#1e1f2c;border:1px solid #4c9aff;border-radius:12px;padding:12px 16px;max-width:256px;min-width:150px;z-index:1000;box-shadow:0 8px 24px rgba(0,0,0,0.4);pointer-events:none;font-family:'Segoe UI',sans-serif;}
+.custom-tooltip .tooltip-title{font-size:1.1rem;font-weight:bold;color:#ff8c42;text-align:center;margin-bottom:8px;word-wrap:break-word;}
+.custom-tooltip .tooltip-divider{height:1px;background:#4c9aff;margin:8px 0;}
+.custom-tooltip .tooltip-desc{font-size:0.85rem;color:#f0f0f0;line-height:1.4;word-wrap:break-word;white-space:pre-line;}
+.empty-message{text-align:center;color:#888;padding:20px;}
+</style>
+</head>
+<body>
+<div class="app-container">
+<div class="sidebar">
+<div class="tags-section">
+<div class="menu-header">🏷️ Теги</div>
+<div class="menu-items" id="tagsList"></div>
+</div>
+<div class="controls-section">
+<div class="zoom-status" id="zoomStatusLabel">Zoom: 1.00x</div>
+</div>
+</div>
+<div class="map-container" id="mapContainer">
+<div class="map-viewport" id="mapViewport">
+<img class="map-image" id="mapImage" draggable="false">
+<div class="buttons-layer" id="buttonsLayer"></div>
+</div>
+</div>
+</div>
+<script>
+const mapData = ${dataStr};
+
+let scale = 1.0, translateX = 0, translateY = 0;
+let isDragging = false, dragStartX = 0, dragStartY = 0, dragStartTranslateX = 0, dragStartTranslateY = 0;
+let imgNaturalWidth = 1, imgNaturalHeight = 1;
+let tagCheckState = mapData.tagCheckState;
+let availableTags = mapData.availableTags;
+let activeTooltip = null;
+let activeButton = null;
+let isPinned = false;
+
+const mapContainer = document.getElementById("mapContainer");
+const mapImage = document.getElementById("mapImage");
+const buttonsLayer = document.getElementById("buttonsLayer");
+const zoomLabel = document.getElementById("zoomStatusLabel");
+
+function hideTooltip() {
+    if (activeTooltip) {
+        activeTooltip.remove();
+        activeTooltip = null;
+        activeButton = null;
+    }
+    isPinned = false;
+}
+
+function showTooltip(btnData, mouseX, mouseY, isClick) {
+    if (activeTooltip && activeButton !== btnData && !isClick) hideTooltip();
+    if (isClick && activeButton === btnData && activeTooltip) { hideTooltip(); return; }
+    if (isClick && activeButton !== btnData) hideTooltip();
+    
+    var tooltip = document.createElement("div");
+    tooltip.className = "custom-tooltip";
+    var title = document.createElement("div");
+    title.className = "tooltip-title";
+    title.textContent = btnData.name || "Метка";
+    var divider = document.createElement("div");
+    divider.className = "tooltip-divider";
+    var desc = document.createElement("div");
+    desc.className = "tooltip-desc";
+    desc.textContent = btnData.description || "Нет описания";
+    tooltip.appendChild(title);
+    tooltip.appendChild(divider);
+    tooltip.appendChild(desc);
+    document.body.appendChild(tooltip);
+    var tooltipRect = tooltip.getBoundingClientRect();
+    var left = mouseX + 15;
+    var top = mouseY - tooltipRect.height / 2;
+    if (left + tooltipRect.width > window.innerWidth) left = mouseX - tooltipRect.width - 15;
+    if (top < 0) top = 5;
+    if (top + tooltipRect.height > window.innerHeight) top = window.innerHeight - tooltipRect.height - 5;
+    tooltip.style.left = left + "px";
+    tooltip.style.top = top + "px";
+    activeTooltip = tooltip;
+    activeButton = btnData;
+    if (isClick) isPinned = true;
+}
+
+mapImage.src = mapData.mapBase64;
+mapImage.onload = function() {
+    imgNaturalWidth = mapImage.naturalWidth;
+    imgNaturalHeight = mapImage.naturalHeight;
+    var rect = mapContainer.getBoundingClientRect();
+    translateX = (rect.width - imgNaturalWidth) / 2;
+    translateY = (rect.height - imgNaturalHeight) / 2;
+    updateTransform();
+    renderButtons();
+};
+
+function renderButtons() {
+    buttonsLayer.innerHTML = "";
+    for (var i = 0; i < mapData.buttons.length; i++) {
+        var btn = mapData.buttons[i];
+        var div = document.createElement("div");
+        div.className = "map-button";
+        var shouldShow = btn.tag === "" || tagCheckState[btn.tag] !== false;
+        if (!shouldShow) div.classList.add("hidden");
+        var size = btn.size || 50;
+        div.style.width = size + "px";
+        div.style.height = size + "px";
+        var img = document.createElement("img");
+        img.src = btn.iconUrl;
+        div.appendChild(img);
+        div.style.position = "absolute";
+        (function(btnData) {
+            div.addEventListener("mouseenter", function(e) {
+                if (!isPinned) {
+                    var rect = div.getBoundingClientRect();
+                    showTooltip(btnData, rect.left + rect.width / 2, rect.top, false);
+                }
+            });
+            div.addEventListener("mouseleave", function() { if (!isPinned) hideTooltip(); });
+            div.addEventListener("click", function(e) {
+                e.stopPropagation();
+                var rect = div.getBoundingClientRect();
+                showTooltip(btnData, rect.left + rect.width / 2, rect.top, true);
+            });
+        })(btn);
+        buttonsLayer.appendChild(div);
+        btn.element = div;
+    }
+    updateButtonsPosition();
+}
+
+function updateButtonsPosition() {
+    for (var i = 0; i < mapData.buttons.length; i++) {
+        var btn = mapData.buttons[i];
+        if (btn.element) {
+            var pos = imageToScreen(btn.x, btn.y);
+            var size = btn.size || 50;
+            btn.element.style.left = (pos.x - size / 2) + "px";
+            btn.element.style.top = (pos.y - size) + "px";
+            btn.element.style.width = size + "px";
+            btn.element.style.height = size + "px";
+        }
+    }
+}
+
+function imageToScreen(imgX, imgY) {
+    return { x: imgX * scale + translateX, y: imgY * scale + translateY };
+}
+
+function updateTransform() {
+    scale = Math.min(3, Math.max(0.5, scale));
+    mapImage.style.transform = "translate(" + translateX + "px, " + translateY + "px) scale(" + scale + ")";
+    zoomLabel.innerText = "Zoom: " + scale.toFixed(2) + "x";
+    updateButtonsPosition();
+}
+
+function handleWheel(e) {
+    e.preventDefault();
+    var delta = -e.deltaY;
+    var zoomFactor = delta > 0 ? 1.08 : 0.93;
+    var ns = scale * zoomFactor;
+    ns = Math.min(3, Math.max(0.5, ns));
+    if (ns === scale) return;
+    var rect = mapContainer.getBoundingClientRect();
+    var mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    var ix = (mx - translateX) / scale, iy = (my - translateY) / scale;
+    scale = ns;
+    translateX = mx - ix * scale;
+    translateY = my - iy * scale;
+    updateTransform();
+}
+
+function onMouseDown(e) { if (e.button !== 0) return; e.preventDefault(); isDragging = true; dragStartX = e.clientX; dragStartY = e.clientY; dragStartTranslateX = translateX; dragStartTranslateY = translateY; mapContainer.style.cursor = "grabbing"; hideTooltip(); }
+function onMouseMove(e) { if (!isDragging) return; translateX = dragStartTranslateX + (e.clientX - dragStartX); translateY = dragStartTranslateY + (e.clientY - dragStartY); updateTransform(); }
+function onMouseUp() { isDragging = false; mapContainer.style.cursor = "grab"; }
+function resetView() { scale = 1.0; var rect = mapContainer.getBoundingClientRect(); translateX = (rect.width - imgNaturalWidth) / 2; translateY = (rect.height - imgNaturalHeight) / 2; updateTransform(); hideTooltip(); }
+
+mapContainer.addEventListener("wheel", handleWheel, { passive: false });
+mapContainer.addEventListener("mousedown", onMouseDown);
+window.addEventListener("mousemove", onMouseMove);
+window.addEventListener("mouseup", onMouseUp);
+zoomLabel.addEventListener("click", resetView);
+mapContainer.style.cursor = "grab";
+document.addEventListener("click", function(e) { if (!e.target.closest(".map-button")) hideTooltip(); });
+
+function renderTagsMenu() {
+    var tagsList = document.getElementById("tagsList");
+    tagsList.innerHTML = "";
+    if (availableTags.length === 0) {
+        tagsList.innerHTML = '<div class="empty-message">Нет тегов</div>';
+        return;
+    }
+    for (var i = 0; i < availableTags.length; i++) {
+        var tag = availableTags[i];
+        var isChecked = tagCheckState[tag] !== false;
+        var itemDiv = document.createElement("div");
+        itemDiv.className = "filter-item";
+        var infoDiv = document.createElement("div");
+        infoDiv.className = "filter-info";
+        var cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.checked = isChecked;
+        (function(tagName) {
+            cb.addEventListener("change", function(e) {
+                tagCheckState[tagName] = e.target.checked;
+                for (var j = 0; j < mapData.buttons.length; j++) {
+                    var btn = mapData.buttons[j];
+                    if (btn.element) {
+                        var shouldShow = btn.tag === "" || tagCheckState[btn.tag] !== false;
+                        if (shouldShow) btn.element.classList.remove("hidden");
+                        else btn.element.classList.add("hidden");
+                    }
+                }
+            });
+        })(tag);
+        var label = document.createElement("label");
+        label.textContent = tag;
+        infoDiv.appendChild(cb);
+        infoDiv.appendChild(label);
+        itemDiv.appendChild(infoDiv);
+        tagsList.appendChild(itemDiv);
+    }
+}
+renderTagsMenu();
+<\/script>
+</body>
+</html>`;
+        }
+
+        document.getElementById('exportBtn').addEventListener('click', () => {
+            if (!currentMapBase64) {
+                alert('Сначала загрузите карту!');
+                return;
+            }
+            const exportData = {
+                mapBase64: currentMapBase64,
+                buttons: buttonsData.map(btn => ({
+                    x: btn.x, y: btn.y, name: btn.name, tag: btn.tag,
+                    description: btn.description, size: btn.size, iconUrl: btn.iconUrl
+                })),
+                availableTags: availableTags,
+                tagCheckState: tagCheckState,
+                iconItems: iconItems
+            };
+
+            const viewerHTML = generateViewerHTML(exportData);
+            const blob = new Blob([viewerHTML], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            const fileName = prompt('Введите название файла:', 'map_export.html');
+            if (fileName) {
+                a.href = url;
+                a.download = fileName.endsWith('.html') ? fileName : fileName + '.html';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            }
+            URL.revokeObjectURL(url);
+        });
+
+        document.getElementById('importBtn').addEventListener('click', () => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.html';
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        const content = event.target.result;
+                        const match = content.match(/const mapData = (\{[\s\S]*?\});/);
+                        if (match) {
+                            try {
+                                const importedData = JSON.parse(match[1]);
+                                if (importedData.mapBase64) {
+                                    currentMapBase64 = importedData.mapBase64;
+                                    mapImage.src = currentMapBase64;
+                                    mapImage.onload = () => {
+                                        imgNaturalWidth = mapImage.naturalWidth;
+                                        imgNaturalHeight = mapImage.naturalHeight;
+                                        imgLoaded = true;
+                                        mapImage.style.display = 'block';
+                                        mapEmpty.style.display = 'none';
+                                        mapLoaded.style.display = 'block';
+
+                                        buttonsData.forEach(btn => btn.element?.remove());
+                                        buttonsData = [];
+                                        iconItems = [];
+
+                                        availableTags = importedData.availableTags || [];
+                                        tagCheckState = importedData.tagCheckState || {};
+
+                                        if (importedData.iconItems && importedData.iconItems.length > 0) {
+                                            iconItems = importedData.iconItems;
+                                            nextIconId = Math.max(...iconItems.map(i => i.id), 0) + 1;
+                                        } else {
+                                            const uniqueIcons = new Map();
+                                            importedData.buttons.forEach(btn => {
+                                                if (!uniqueIcons.has(btn.iconUrl)) {
+                                                    uniqueIcons.set(btn.iconUrl, {
+                                                        id: nextIconId++,
+                                                        iconUrl: btn.iconUrl,
+                                                        name: btn.name,
+                                                        description: btn.description,
+                                                        tag: btn.tag
+                                                    });
+                                                }
+                                            });
+                                            iconItems = Array.from(uniqueIcons.values());
+                                        }
+
+                                        importedData.buttons.forEach(btn => {
+                                            const newBtn = { ...btn, id: nextId++, element: null };
+                                            const element = createButtonElement(newBtn);
+                                            newBtn.element = element;
+                                            buttonsLayer.appendChild(element);
+                                            buttonsData.push(newBtn);
+                                        });
+
+                                        renderTagsMenu();
+                                        updateTagSelect();
+                                        renderIconsGrid();
+                                        updateFilter();
+
+                                        scale = 1.0;
+                                        const rect = mapContainer.getBoundingClientRect();
+                                        translateX = (rect.width - imgNaturalWidth) / 2;
+                                        translateY = (rect.height - imgNaturalHeight) / 2;
+                                        updateTransform();
+                                    };
+                                }
+                            } catch (err) { alert('Ошибка импорта: ' + err.message); }
+                        } else alert('Неверный формат файла');
+                    };
+                    reader.readAsText(file);
+                }
+            };
+            input.click();
+        });
+
+        renderTagsMenu();
+        updateTagSelect();
+        renderIconsGrid();
+    </script>
+</body>
+
+</html>
